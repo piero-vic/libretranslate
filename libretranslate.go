@@ -11,18 +11,29 @@ import (
 )
 
 // DefaultBaseURL contains the default base url for the LibreTranslate API.
-const DefaultBaseURL = "https://translate.argosopentech.com"
+const DefaultBaseURL = "https://libretranslate.com"
 
 // Client handles the interaction with the LibreTranslate API.
 type Client struct {
 	baseUrl string
+	token   string
 	client  *http.Client
 }
 
 // NewClient returns a new API client with the given token.
-func NewClient() *Client {
+func NewClient(token string) *Client {
 	return &Client{
 		baseUrl: DefaultBaseURL,
+		token:   token,
+		client:  http.DefaultClient,
+	}
+}
+
+// NewClientWithBaseURL returns a new API client with the given token.
+func NewClientWithBaseURL(baseURL string, token string) *Client {
+	return &Client{
+		baseUrl: baseURL,
+		token:   token,
 		client:  http.DefaultClient,
 	}
 }
@@ -52,6 +63,7 @@ type TranslateResult struct {
 func (c *Client) Detect(q string) ([]Detection, error) {
 	params := url.Values{}
 	params.Set("q", q)
+	params.Set("api_key", c.token)
 
 	req, err := c.buildRequest(http.MethodPost, "/detect", params)
 	if err != nil {
@@ -80,7 +92,13 @@ func (c *Client) Detect(q string) ([]Detection, error) {
 
 // Getlanguages makes a request to retrieve the list of supported languages.
 func (c *Client) GetLanguages() ([]Language, error) {
-	req, err := c.buildRequest(http.MethodGet, "/languages", url.Values{})
+	params := url.Values{}
+	params.Set("api_key", c.token)
+
+	req, err := c.buildRequest(http.MethodGet, "/languages", params)
+	if err != nil {
+		return nil, err
+	}
 
 	res, err := c.client.Do(req)
 	if err != nil {
@@ -108,6 +126,7 @@ func (c *Client) Translate(query, source, target string) (string, error) {
 	params.Set("q", query)
 	params.Set("source", source)
 	params.Set("target", target)
+	params.Set("api_key", c.token)
 
 	req, err := c.buildRequest(http.MethodPost, "/translate", params)
 	if err != nil {
@@ -167,7 +186,10 @@ func checkForResponseErrors(res *http.Response) (io.ReadCloser, error) {
 	if status != 200 {
 		var result apiError
 		if err := json.NewDecoder(body).Decode(&result); err != nil {
-			return nil, fmt.Errorf("API error: non-ok response (%d) from the API and failed to decode error message", status)
+			return nil, fmt.Errorf(
+				"API error: non-ok response (%d) from the API and failed to decode error message",
+				status,
+			)
 		}
 
 		return nil, fmt.Errorf("API error: code %d - %s", status, result.Error)

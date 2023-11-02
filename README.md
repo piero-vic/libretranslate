@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	lt := libretranslate.NewClient()
+	lt := libretranslate.NewClient("<your_api_token>")
 
 	// Example 1: Detect Language
 	detectedLanguages, err := lt.Detect("Hello, world!")
