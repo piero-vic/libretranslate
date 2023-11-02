@@ -54,8 +54,11 @@ type Language struct {
 	Name string `json:"name"`
 }
 
-// Language represents the result for a translation query.
+// TranslateResult represents the result for a translation query.
 type TranslateResult struct {
+	// Detected language information (only for auto detect)
+	DetectedLanguage Detection `json:"detectedLanguage"`
+	// Translated text
 	TranslatedText string `json:"translatedText"`
 }
 
