@@ -73,12 +73,7 @@ func (c *Client) Detect(q string) ([]Detection, error) {
 		return nil, err
 	}
 
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	responseBody, err := checkForResponseErrors(res)
+	responseBody, err := doRequest(c.client, req)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +81,9 @@ func (c *Client) Detect(q string) ([]Detection, error) {
 	defer responseBody.Close()
 
 	result := []Detection{}
-	if err := json.NewDecoder(responseBody).Decode(&result); err != nil {
-		return nil, err
-	}
+	err = json.NewDecoder(responseBody).Decode(&result)
 
-	return result, nil
+	return result, err
 }
 
 // Getlanguages makes a request to retrieve the list of supported languages.
@@ -103,12 +96,7 @@ func (c *Client) GetLanguages() ([]Language, error) {
 		return nil, err
 	}
 
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	responseBody, err := checkForResponseErrors(res)
+	responseBody, err := doRequest(c.client, req)
 	if err != nil {
 		return nil, err
 	}
@@ -116,11 +104,9 @@ func (c *Client) GetLanguages() ([]Language, error) {
 	defer responseBody.Close()
 
 	result := []Language{}
-	if err := json.NewDecoder(responseBody).Decode(&result); err != nil {
-		return result, err
-	}
+	err = json.NewDecoder(responseBody).Decode(&result)
 
-	return result, nil
+	return result, err
 }
 
 // Translate makes a request to translate a given text from one language to another.
@@ -136,12 +122,7 @@ func (c *Client) Translate(query, source, target string) (string, error) {
 		return "", err
 	}
 
-	res, err := c.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	responseBody, err := checkForResponseErrors(res)
+	responseBody, err := doRequest(c.client, req)
 	if err != nil {
 		return "", err
 	}
@@ -177,26 +158,33 @@ func (c *Client) buildRequest(method, endpoint string, params url.Values) (*http
 	return req, nil
 }
 
+// doRequest makes an HTTP request and returns the response body.
+func doRequest(client *http.Client, req *http.Request) (io.ReadCloser, error) {
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkForResponseErrors(res)
+}
+
 type apiError struct {
 	Error string `json:"error"`
 }
 
 // checkForResponseErrors checks an HTTP response for errors and returns the response body.
 func checkForResponseErrors(res *http.Response) (io.ReadCloser, error) {
-	body := res.Body
-	status := res.StatusCode
-
-	if status != 200 {
+	if res.StatusCode != http.StatusOK {
 		var result apiError
-		if err := json.NewDecoder(body).Decode(&result); err != nil {
+		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf(
 				"API error: non-ok response (%d) from the API and failed to decode error message",
-				status,
+				res.StatusCode,
 			)
 		}
 
-		return nil, fmt.Errorf("API error: code %d - %s", status, result.Error)
+		return nil, fmt.Errorf("API error: code %d - %s", res.StatusCode, result.Error)
 	}
 
-	return body, nil
+	return res.Body, nil
 }
